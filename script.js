@@ -157,3 +157,124 @@ document.getElementById('btn-mark-learned').addEventListener('click', () => {
         loadNewLearnWord(); 
     }
 });
+/* =========================================
+   5. ADVANCED PRACTICE MODE LOGIC
+   ========================================= */
+let currentQuizWord = null;
+let currentQuizType = "";
+
+function loadPracticeQuiz() {
+    const practiceContainer = document.getElementById('practice-container');
+    const practiceEmpty = document.getElementById('practice-empty');
+    
+    // Still requires at least 4 learned words to generate 4 options
+    if (userData.learnedWords.length < 4) {
+        practiceContainer.classList.add('hidden');
+        practiceEmpty.classList.remove('hidden');
+        return;
+    }
+
+    practiceContainer.classList.remove('hidden');
+    practiceEmpty.classList.add('hidden');
+    
+    // Reset UI
+    document.getElementById('quiz-feedback').classList.add('hidden');
+    document.getElementById('btn-next-quiz').classList.add('hidden');
+    const optionsContainer = document.getElementById('quiz-options');
+    optionsContainer.innerHTML = ""; 
+
+    // 1. Pick 1 random learned word as the target
+    const targetWordString = userData.learnedWords[Math.floor(Math.random() * userData.learnedWords.length)];
+    currentQuizWord = wordDatabase.find(w => w.word === targetWordString);
+
+    // 2. Randomly decide the Quiz Type (0, 1, or 2)
+    const quizTypes = ['find_def', 'find_word', 'fitb'];
+    currentQuizType = quizTypes[Math.floor(Math.random() * quizTypes.length)];
+
+    const questionTextEl = document.querySelector('.quiz-question');
+    let options = [];
+    let correctAnswer = "";
+
+    // -- QUIZ TYPE 1: Multiple Choice Definition --
+    if (currentQuizType === 'find_def') {
+        questionTextEl.innerHTML = `What is the definition of: <strong class="highlight">${currentQuizWord.word}</strong>?`;
+        correctAnswer = currentQuizWord.definition;
+        options.push(correctAnswer);
+        
+        while(options.length < 4) {
+            let randomWord = wordDatabase[Math.floor(Math.random() * wordDatabase.length)];
+            if(!options.includes(randomWord.definition)) options.push(randomWord.definition);
+        }
+    } 
+    // -- QUIZ TYPE 2: Match Word to Definition --
+    else if (currentQuizType === 'find_word') {
+        questionTextEl.innerHTML = `Which word means: <br><em style="color:var(--text-main); font-size:16px;">"${currentQuizWord.definition}"</em>?`;
+        correctAnswer = currentQuizWord.word;
+        options.push(correctAnswer);
+        
+        while(options.length < 4) {
+            let randomWord = wordDatabase[Math.floor(Math.random() * wordDatabase.length)];
+            if(!options.includes(randomWord.word)) options.push(randomWord.word);
+        }
+    } 
+    // -- QUIZ TYPE 3: Fill in the Blank --
+    else if (currentQuizType === 'fitb') {
+        // This uses Regex to find the word in the example sentence and replace it with a blank line
+        const blankSentence = currentQuizWord.example.replace(new RegExp(currentQuizWord.word, 'ig'), "________");
+        questionTextEl.innerHTML = `Fill in the blank: <br><em style="color:var(--text-main); font-size:16px;">"${blankSentence}"</em>`;
+        correctAnswer = currentQuizWord.word;
+        options.push(correctAnswer);
+        
+        while(options.length < 4) {
+            let randomWord = wordDatabase[Math.floor(Math.random() * wordDatabase.length)];
+            if(!options.includes(randomWord.word)) options.push(randomWord.word);
+        }
+    }
+
+    // Shuffle the options array so the correct answer isn't always the first button
+    options = options.sort(() => Math.random() - 0.5);
+
+    // Create buttons for the options
+    options.forEach(optionText => {
+        const btn = document.createElement('button');
+        btn.className = 'btn option-btn';
+        btn.innerText = optionText;
+        
+        btn.addEventListener('click', () => handleQuizAnswer(btn, optionText === correctAnswer, correctAnswer));
+        
+        optionsContainer.appendChild(btn);
+    });
+}
+
+function handleQuizAnswer(selectedBtn, isCorrect, correctAnswer) {
+    // Disable all buttons after guess
+    const buttons = document.querySelectorAll('.option-btn');
+    buttons.forEach(btn => btn.disabled = true);
+
+    const feedback = document.getElementById('quiz-feedback');
+    feedback.classList.remove('hidden');
+
+    if (isCorrect) {
+        selectedBtn.classList.add('correct');
+        feedback.innerText = "🎉 Correct! +5 XP";
+        feedback.style.color = "var(--primary-green-shadow)";
+        userData.xp += 5; // Track Score
+        saveUserData();
+    } else {
+        selectedBtn.classList.add('wrong');
+        feedback.innerText = "❌ Incorrect. Keep practicing!";
+        feedback.style.color = "red";
+        
+        // Highlight the correct answer for feedback
+        buttons.forEach(btn => {
+            if (btn.innerText === correctAnswer) {
+                btn.classList.add('correct');
+            }
+        });
+    }
+
+    document.getElementById('btn-next-quiz').classList.remove('hidden');
+}
+
+// Keep your existing event listener attached
+document.getElementById('btn-next-quiz').addEventListener('click', loadPracticeQuiz);
